@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCHOOL QUEST 〜卒業まであと○単位〜</title>
+    <style>
+        :root {
+            --primary-color: #4caf50;
+            --danger-color: #f44336;
+            --warning-color: #ff9800;
+            --info-color: #2196f3;
+            --dark-bg: #1e2522;
+        }
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: 'Helvetica Neue', Arial, "Hiragino Kaku Gothic ProN", sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            max-height: 600px;
+            background-color: var(--dark-bg);
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        .screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0; left: 0;
+        }
+        .screen.active { display: flex; }
+
+        /* タイトル画面 */
+        #title-screen {
+            justify-content: flex-end;
+            align-items: center;
+            background-image: url('game_opening.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            text-align: center;
+            padding-bottom: 140px;
+        }
+        #title-screen h1, #title-screen .subtitle { display: none; }
+        
+        .menu-buttons { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            width: 250px; 
+        }
+
+        .btn-title {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: linear-gradient(to bottom, #2c2c3e, #1a1a26);
+            color: #fff;
+            border: 3px solid #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #000;
+            text-align: center;
+        }
+        .btn-title:hover { background: #fff; color: #000; }
+        .btn-title:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn {
+            padding: 10px 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: rgba(30, 30, 40, 0.85);
+            color: #fff;
+            border: 2px solid #fff;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn:hover { background-color: #fff; color: #000; }
+
+        /* イベント・会話画面 */
+        #event-screen {
+            background-color: #000;
+            justify-content: flex-end;
+            padding: 20px;
+        }
+        #speaker-name {
+            background-color: var(--info-color);
+            padding: 5px 15px;
+            border-radius: 5px 5px 0 0;
+            font-weight: bold;
+            display: inline-block;
+            border: 2px solid #fff;
+            border-bottom: none;
+        }
+        #text-box {
+            background-color: #222;
+            border: 3px solid #fff;
+            border-radius: 0 10px 10px 10px;
+            padding: 20px;
+            min-height: 100px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            cursor: pointer;
+            position: relative;
+        }
+        #text-box::after { content: "▼"; position: absolute; bottom: 10px; right: 20px; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+        /* バトル画面 */
+        #battle-screen { justify-content: space-between; background-color: #151515; }
+        #enemy-stage {
+            height: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(to bottom, #111, #252525);
+            border-bottom: 3px solid #fff;
+            position: relative;
+            padding-top: 10px;
+        }
+        
+        /* グラフィック表示エリア */
+        .enemy-graphic-container {
+            width: 160px;
+            height: 160px;
+            position: relative;
+            margin: 5px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* ドット絵がボケないようにプレビュー設定 */
+        #enemy-sprite-view {
+            width: 100%;
+            height: 100%;
+            background-size: contain;
+            background-position: center bottom;
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            transition: transform 0.1s;
+        }
+
+        /* アニメーション演出 */
+        .hit-anim { animation: shake-red 0.3s ease-in-out; }
+        .attack-anim { animation: thrust-forward 0.4s ease-in-out; }
+
+        @keyframes shake-red {
+            0%, 100% { transform: translateX(0); filter: brightness(1); }
+            20%, 60% { transform: translateX(-10px); filter: brightness(1) sepia(1) saturate(10) hue-rotate(-50deg); }
+            40%, 80% { transform: translateX(10px); filter: brightness(1) sepia(1) saturate(10) hue-rotate(-50deg); }
+        }
+        @keyframes thrust-forward {
+            0%, 100% { transform: scale(1) translateY(0); }
+            50% { transform: scale(1.2) translateY(20px); }
+        }
+
+        #enemy-info { text-align: center; width: 80%; }
+        #enemy-name { font-size: 1.3rem; font-weight: bold; color: #ffeb3b; text-shadow: 2px 2px #000; }
+        .hp-bar { width: 100%; height: 14px; border: 2px solid #fff; background-color: #444; border-radius: 7px; overflow: hidden; margin-top: 5px; }
+        .hp-fill { width: 100%; height: 100%; background-color: var(--danger-color); transition: width 0.3s; }
+        #enemy-buffs { margin-top: 5px; font-size: 0.8rem; min-height: 18px; color: #00ffff; }
+
+        /* メッセージログ */
+        #log-area {
+            height: 15%;
+            background-color: #000;
+            border-bottom: 3px solid #fff;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        /* 操作パネル */
+        #control-panel { height: 35%; display: flex; background-color: #222; }
+        #status-window {
+            width: 55%;
+            border-right: 3px solid #fff;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            background-color: #1a1a1a;
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            padding: 2px 6px;
+            border-radius: 5px;
+        }
+        .status-row.active-turn { background-color: rgba(255,235,59,0.15); border: 1px solid #ffeb3b; }
+        .status-row.dead { opacity: 0.4; }
+        .char-stats { text-align: right; }
+        .state-badge { background-color: var(--warning-color); color: #000; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; font-weight: bold; }
+
+        /* コマンド/選択ウィンドウ */
+        #command-window { width: 45%; padding: 8px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; }
+        #selection-window {
+            display: none;
+            width: 45%;
+            padding: 8px;
+            box-sizing: border-box;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(4, 1fr);
+            gap: 6px;
+            overflow-y: auto;
+        }
+
+        .fullscreen-overlay { justify-content: center; align-items: center; background-color: rgba(0,0,0,0.9); text-align: center; }
+        .result-title { font-size: 3rem; font-weight: bold; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+
+    <div id="title-screen" class="screen active">
+        <h1>SCHOOL QUEST</h1>
+        <div class="subtitle">〜卒業まであと3単位〜</div>
+        <div class="menu-buttons">
+            <button class="btn-title" onclick="initNewGame()">最初から始める</button>
+            <button class="btn-title" id="continue-btn" onclick="loadGame()" disabled>つづきから</button>
+        </div>
+    </div>
+
+    <div id="event-screen" class="screen">
+        <div style="width: 100%;">
+            <div id="speaker-name">？？？</div><br>
+            <div id="text-box" onclick="advanceEvent()">テキスト</div>
+        </div>
+    </div>
+
+    <div id="battle-screen" class="screen">
+        <div id="enemy-stage">
+            <div id="enemy-name">先生</div>
+            <div class="enemy-graphic-container">
+                <div id="enemy-sprite-view"></div>
+            </div>
+            <div id="enemy-info">
+                <div class="hp-bar"><div id="enemy-hp-fill" class="hp-fill"></div></div>
+                <div id="enemy-buffs"></div>
+            </div>
+        </div>
+
+        <div id="log-area"></div>
+
+        <div id="control-panel">
+            <div id="status-window"></div>
+            <div id="command-window">
+                <button class="btn" onclick="handleMainCommand('attack')">⚔ 攻撃</button>
+                <button class="btn" onclick="handleMainCommand('skill')">📚 スキル</button>
+                <button class="btn" onclick="handleMainCommand('item')">🎒 アイテム</button>
+                <button class="btn" onclick="handleMainCommand('defense')">🛡 防御</button>
+            </div>
+            <div id="selection-window"></div>
+        </div>
+    </div>
+
+    <div id="win-screen" class="screen fullscreen-overlay">
+        <div class="result-title" style="color: #4caf50;">卒業決定！</div>
+        <p style="font-size: 1.2rem; margin-bottom: 30px;">あなたは全ての再試験を突破し、無事に卒業した！</p>
+        <button class="btn" onclick="returnToTitle()">タイトルへ</button>
+    </div>
+
+    <div id="lose-screen" class="screen fullscreen-overlay">
+        <div class="result-title" style="color: var(--danger-color);">留年確定...</div>
+        <button class="btn" onclick="retryBattle()">再試験をやり直す</button>
+        <button class="btn" onclick="returnToTitle()" style="margin-top: 10px;">タイトルへ</button>
+    </div>
+
+</div>
+
+<script>
+const ATTRIBUTE = { NONE: 0, SCIENCE: 1, CLASSIC: 2, PE: 3 };
+const STATE = { NONE: "", SLEEP: "居眠り", RED: "赤点", LATE: "遅刻", STOMACH: "腹痛" };
+
+const initialParty = [
+    { id: 0, name: "主人公", role: "バランス", level: 1, exp: 0, hp: 140, maxHp: 140, mp: 40, maxMp: 40, atk: 25, def: 18, agi: 15, attr: ATTRIBUTE.NONE, state: STATE.NONE, baseSkills: [0, 1] },
+    { id: 1, name: "学級委員", role: "サポート", level: 1, exp: 0, hp: 110, maxHp: 110, mp: 65, maxMp: 65, atk: 15, def: 22, agi: 12, attr: ATTRIBUTE.CLASSIC, state: STATE.NONE, baseSkills: [2, 3] },
+    { id: 2, name: "オタク", role: "魔法・知識", level: 1, exp: 0, hp: 95, maxHp: 95, mp: 90, maxMp: 90, atk: 12, def: 14, agi: 10, attr: ATTRIBUTE.SCIENCE, state: STATE.NONE, baseSkills: [4, 5] },
+    { id: 3, name: "ギャル", role: "素早・妨害", level: 1, exp: 0, hp: 120, maxHp: 120, mp: 50, maxMp: 50, atk: 20, def: 15, agi: 25, attr: ATTRIBUTE.PE, state: STATE.NONE, baseSkills: [6, 7] }
+];
+
+const SKILLS = {
+    0: { name: "一夜漬け", cost: 8, type: "buff" },
+    1: { name: "全力解答", cost: 15, type: "damage", multiplier: 2.5 },
+    2: { name: "ノート共有", cost: 10, type: "heal", power: 45 },
+    3: { name: "予習完璧", cost: 12, type: "buff" },
+    4: { name: "数式ビーム", cost: 12, type: "damage", multiplier: 2.0 },
+    5: { name: "過去問召喚", cost: 20, type: "damage", multiplier: 3.2 },
+    6: { name: "コミュ力威嚇", cost: 8, type: "state", state: STATE.RED },
+    7: { name: "テンアゲ", cost: 10, type: "buff" }
+};
+
+let inventory = [{ name: "エナドリ", type: "heal_hp", val: 60, count: 3 }, { name: "チョコ", type: "heal_mp", val: 25, count: 2 }];
+
+// 3枚の正方形PNGファイルをそのまま指定するようにマスタデータをクリーンアップ
+const ENEMIES_MASTER = [
+    {
+        name: "新米英語教師「佐藤先生」",
+        sprite: "sato_normal.png",
+        hp: 450, maxHp: 450, atk: 18, def: 15, agi: 13, attr: ATTRIBUTE.CLASSIC, expReward: 40,
+        ai: function(turn) {
+            if (turn % 3 === 0) return { msg: "佐藤先生のリスニングテスト！" };
+            if (Math.random() < 0.5) return { msg: "佐藤先生の単語テスト！" };
+            return { msg: "佐藤先生の文法ミス指摘！" };
+        }
+    },
+    {
+        name: "超熱血体育教師「鬼塚先生」",
+        sprite: "onizuka_normal.png",
+        hp: 900, maxHp: 900, atk: 32, def: 25, agi: 22, attr: ATTRIBUTE.PE, expReward: 100,
+        ai: function(turn) {
+            if (turn % 3 === 0) return { msg: "鬼塚先生のシャトルラン！" };
+            if (Math.random() < 0.5) return { msg: "鬼塚先生の気合注入！" };
+            return { msg: "鬼塚先生のドッジボール！" };
+        }
+    },
+    {
+        name: "再試の支配者「教頭先生」",
+        sprite: "kyoutou.png",
+        hp: 2200, maxHp: 2200, atk: 45, def: 35, agi: 18, attr: ATTRIBUTE.SCIENCE, expReward: 999,
+        ai: function(turn) {
+            if (turn % 3 === 0) return { msg: "教頭先生の追試宣告！" };
+            if (Math.random() < 0.5) return { msg: "教頭先生の大量課題！" };
+            return { msg: "教頭先生の絶望の通達！" };
+        }
+    }
+];
+
+let party = [];
+let currentEnemy = null;
+let currentEnemyIndex = 0;
+let battleTurnCount = 0;
+let currentActorIndex = 0;
+let battleActive = false;
+
+const EVENTS = {
+    start: [{ name: "主人公", text: "テスト赤点だらけで再試験になってしまった…" }, { name: "佐藤先生", text: "さあ、再試験を始めますよ！" }],
+    after_sato: [{ name: "佐藤先生", text: "やるわね…でも次は体育の鬼塚先生よ！" }],
+    before_onizuka: [{ name: "鬼塚先生", text: "根性から叩き直して演る、構えろ！" }],
+    after_onizuka: [{ name: "鬼塚先生", text: "見事だ…だが教頭先生は次元が違うぞ…" }],
+    before_boss: [{ name: "教頭先生", text: "私の作る最終卒業試験、突破できるかな？" }]
+};
+let currentEventKey = "";
+let currentEventIndex = 0;
+
+function saveGame() {
+    localStorage.setItem("school_quest_save", JSON.stringify({ currentEnemyIndex, party, inventory }));
+}
+
+function loadGame() {
+    const saveData = JSON.parse(localStorage.getItem("school_quest_save"));
+    if (!saveData) return;
+    currentEnemyIndex = saveData.currentEnemyIndex;
+    party = saveData.party;
+    inventory = saveData.inventory;
+    if (currentEnemyIndex === 0) startEvent("start");
+    else if (currentEnemyIndex === 1) startEvent("before_onizuka");
+    else if (currentEnemyIndex === 2) startEvent("before_boss");
+}
+
+function checkSaveData() {
+    if (localStorage.getItem("school_quest_save")) document.getElementById("continue-btn").disabled = false;
+}
+window.onload = checkSaveData;
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+}
+
+function pushLog(msg, color = "#fff") {
+    const logArea = document.getElementById("log-area");
+    logArea.innerHTML = `<div style="color: ${color}">${msg}</div>` + logArea.innerHTML;
+}
+
+// シンプルに画像をそのまま背景にセットする設計に修正
+function renderEnemyGraphic() {
+    const view = document.getElementById("enemy-sprite-view");
+    if (currentEnemy) {
+        view.style.backgroundImage = `url('${currentEnemy.sprite}')`;
+    }
+}
+
+function renderStatus() {
+    const win = document.getElementById("status-window");
+    win.innerHTML = "";
+    party.forEach((char, idx) => {
+        const isTurn = (battleActive && idx === currentActorIndex) ? "active-turn" : "";
+        const stateBadge = char.state ? `<span class="state-badge">${char.state}</span>` : "";
+        win.innerHTML += `
+            <div class="status-row ${isTurn} ${char.hp<=0?'dead':''}">
+                <div><b>${char.name}</b> <span style="font-size:0.7rem;color:#aaa;">Lv.${char.level}</span> ${stateBadge}</div>
+                <div class="char-stats">HP: <span style="color:#4caf50">${char.hp}</span>/${char.maxHp} MP: ${char.mp}</div>
+            </div>`;
+    });
+}
+
+function updateEnemyUI() {
+    if (!currentEnemy) return;
+    document.getElementById("enemy-name").innerText = currentEnemy.name;
+    renderEnemyGraphic();
+    const pct = Math.max(0, (currentEnemy.hp / currentEnemy.maxHp) * 100);
+    document.getElementById("enemy-hp-fill").style.width = pct + "%";
+}
+
+function startEvent(key) {
+    currentEventKey = key; currentEventIndex = 0;
+    showScreen("event-screen");
+    presentEventLine();
+}
+
+function presentEventLine() {
+    const lines = EVENTS[currentEventKey];
+    if (currentEventIndex >= lines.length) {
+        if (currentEventKey === "start") startBattle(0);
+        else if (currentEventKey === "after_sato") startEvent("before_onizuka");
+        else if (currentEventKey === "after_onizuka") startEvent("before_boss");
+        else if (currentEventKey === "before_onizuka") startBattle(1);
+        else if (currentEventKey === "before_boss") startBattle(2);
+        return;
+    }
+    document.getElementById("speaker-name").innerText = lines[currentEventIndex].name;
+    document.getElementById("text-box").innerText = lines[currentEventIndex].text;
+}
+
+function advanceEvent() { currentEventIndex++; presentEventLine(); }
+
+function initNewGame() {
+    party = JSON.parse(JSON.stringify(initialParty));
+    currentEnemyIndex = 0;
+    startEvent("start");
+}
+
+function startBattle(enemyIdx) {
+    currentEnemyIndex = enemyIdx;
+    currentEnemy = { ...ENEMIES_MASTER[enemyIdx] };
+    battleTurnCount = 1; battleActive = true;
+    showScreen("battle-screen");
+    document.getElementById("log-area").innerHTML = "";
+    pushLog(`⚔ 【${currentEnemy.name}】とのテストバトル開始！`, "#ffeb3b");
+    updateEnemyUI();
+    saveGame();
+    beginPlayerTurn();
+}
+
+function beginPlayerTurn() {
+    currentActorIndex = 0;
+    while (currentActorIndex < 4 && party[currentActorIndex].hp <= 0) currentActorIndex++;
+    if (currentActorIndex >= 4) { checkBattleEnd(); return; }
+    renderStatus();
+    toggleCommandWindows(true);
+}
+
+function toggleCommandWindows(showMain) {
+    document.getElementById("command-window").style.display = showMain ? "grid" : "none";
+    document.getElementById("selection-window").style.display = showMain ? "none" : "grid";
+}
+
+function handleMainCommand(type) {
+    const actor = party[currentActorIndex];
+    if (type === 'attack') {
+        let dmg = Math.floor(Math.max(5, actor.atk - currentEnemy.def*0.4) * (0.9 + Math.random()*0.2));
+        currentEnemy.hp = Math.max(0, currentEnemy.hp - dmg);
+        pushLog(`⚔ ${actor.name}の攻撃！ 先生に ${dmg} ダメージ！`);
+        
+        // ダメージ時の赤点滅＆揺れアニメーション
+        const view = document.getElementById("enemy-sprite-view");
+        view.classList.add("hit-anim");
+        setTimeout(() => view.classList.remove("hit-anim"), 300);
+        
+        updateEnemyUI();
+        if (!checkBattleEnd()) advanceActor();
+    } else if (type === 'defense') {
+        actor.isDefense = true;
+        pushLog(`🛡 ${actor.name}は防御体勢をとった。`);
+        advanceActor();
+    } else if (type === 'skill') openSubWindow('skill');
+    else if (type === 'item') openSubWindow('item');
+}
+
+function openSubWindow(mode) {
+    toggleCommandWindows(false);
+    const sel = document.getElementById("selection-window");
+    sel.innerHTML = "";
+    const actor = party[currentActorIndex];
+    
+    if (mode === 'skill') {
+        actor.baseSkills.forEach(id => {
+            const sk = SKILLS[id];
+            const btn = document.createElement("button");
+            btn.className = "btn"; btn.innerText = `${sk.name} (${sk.cost})`;
+            btn.onclick = () => {
+                actor.mp -= sk.cost;
+                if (sk.type === "damage") {
+                    let dmg = Math.floor(actor.atk * sk.multiplier);
+                    currentEnemy.hp = Math.max(0, currentEnemy.hp - dmg);
+                    pushLog(`💥 ${sk.name}！ 先生に ${dmg} ダメージ！`);
+                    const view = document.getElementById("enemy-sprite-view");
+                    view.classList.add("hit-anim");
+                    setTimeout(() => view.classList.remove("hit-anim"), 300);
+                } else if (sk.type === "heal") {
+                    party.forEach(m => { if(m.hp>0) m.hp = Math.min(m.maxHp, m.hp + sk.power); });
+                    pushLog(`💚 全員のHPが回復した！`);
+                }
+                updateEnemyUI();
+                if (!checkBattleEnd()) advanceActor();
+            };
+            sel.appendChild(btn);
+        });
+    }
+    const cbtn = document.createElement("button"); cbtn.className="btn"; cbtn.innerText="戻る"; cbtn.onclick=()=>toggleCommandWindows(true); sel.appendChild(cbtn);
+}
+
+function advanceActor() {
+    currentActorIndex++;
+    while (currentActorIndex < 4 && party[currentActorIndex].hp <= 0) currentActorIndex++;
+    if (currentActorIndex < 4) { renderStatus(); toggleCommandWindows(true); } 
+    else { toggleCommandWindows(false); setTimeout(enemyTurn, 800); }
+}
+
+function enemyTurn() {
+    if (!battleActive) return;
+    let decision = currentEnemy.ai(battleTurnCount);
+    pushLog(`😈 ${decision.msg}`, "#f44336");
+    
+    // 敵の体当たり（身乗り出し）攻撃モーション
+    const view = document.getElementById("enemy-sprite-view");
+    view.classList.add("attack-anim");
+
+    setTimeout(() => {
+        view.classList.remove("attack-anim");
+        
+        party.forEach(m => {
+            if (m.hp > 0) {
+                let dmg = Math.floor(Math.max(5, currentEnemy.atk - m.def*0.4));
+                if (m.isDefense) dmg = Math.floor(dmg * 0.4);
+                m.hp = Math.max(0, m.hp - dmg);
+            }
+        });
+        
+        party.forEach(c => c.isDefense = false);
+        battleTurnCount++;
+        renderStatus();
+        if (!checkBattleEnd()) beginPlayerTurn();
+    }, 400);
+}
+
+function checkBattleEnd() {
+    if (currentEnemy.hp <= 0) {
+        battleActive = false;
+        pushLog(`🎉 テストバトルに勝利した！`, "#4caf50");
+        setTimeout(() => {
+            if (currentEnemyIndex === 0) startEvent("after_sato");
+            else if (currentEnemyIndex === 1) startEvent("after_onizuka");
+            else showScreen("win-screen");
+        }, 1000);
+        return true;
+    }
+    if (party.every(m => m.hp <= 0)) {
+        battleActive = false;
+        showScreen("lose-screen");
+        return true;
+    }
+    return false;
+}
+
+function retryBattle() {
+    party.forEach(m => { m.hp = m.maxHp; m.mp = m.maxMp; });
+    startBattle(currentEnemyIndex);
+}
+
+function returnToTitle() { showScreen("title-screen"); checkSaveData(); }
+</script>
+
+</body>
+</html>
